@@ -48,7 +48,7 @@
 
             @php
                 $tabs = [
-                    ['id' => 'basic', 'label' => 'Basic Information'],
+                    ['id' => 'basic', 'label' => 'Basic Information and Profile Photo'],
                     ['id' => 'private', 'label' => 'Private Information'],
                     ['id' => 'access', 'label' => 'Access Level'],
                     ['id' => 'schedule', 'label' => 'Schedule'],
