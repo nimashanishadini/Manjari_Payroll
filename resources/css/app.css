@@ -1,0 +1,20 @@
+
+@import "tailwindcss";
+
+@source "../views/**/*.blade.php";
+@source "../js/**/*.js";
+
+@theme {
+    --color-navy-950: #070c16;
+    --color-navy-900: #0b111e;
+    --color-navy-850: #0e1726;
+    --color-navy-800: #101828;
+    --color-navy-700: #1e293b;
+    --color-navy-600: #334155;
+
+    --color-corporate-red: #c81e24;
+    --color-corporate-red-hover: #a8171c;
+    --color-corporate-red-active: #911317;
+    --color-corporate-red-light: #fdf2f2;
+    --color-corporate-red-border: #fecaca;
+}
