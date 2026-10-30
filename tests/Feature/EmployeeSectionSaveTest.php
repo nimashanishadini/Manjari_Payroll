@@ -12,6 +12,27 @@ class EmployeeSectionSaveTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_additional_fields_store_validate_and_reload_employee_values(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $field = \App\Models\EmployeeAdditionalField::create(['name' => 'Uniform size', 'type' => 'select', 'visibility' => 'private', 'show_in_person_list' => false, 'options' => ['Small', 'Large']]);
+        $number = \App\Models\EmployeeAdditionalField::create(['name' => 'Locker', 'type' => 'number', 'visibility' => 'public', 'show_in_person_list' => false]);
+        $this->postJson(route('hr.person.sections.store'), ['section' => 'extra'])->assertUnprocessable();
+        $id = $this->postJson(route('hr.person.sections.store'), $this->basicData())->assertOk()->json('id');
+        $payload = ['section' => 'extra', 'record_id' => $id, 'additional_values' => [$field->id => 'Large', $number->id => '12']];
+        $this->postJson(route('hr.person.sections.store'), $payload)->assertOk();
+        $this->getJson(route('hr.person.lookup', ['employee_id' => 'EMP001']))->assertOk()->assertJsonPath('employee.additional_values.'.$field->id, 'Large');
+        $this->withoutVite()->get(route('hr.person.create', ['employee' => $id]))->assertOk()->assertSee('Uniform size')->assertSee('additional_values['.$field->id.']', false);
+        $payload['additional_values'] = [$field->id => 'Invalid', $number->id => 'abc'];
+        $this->postJson(route('hr.person.sections.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors(['additional_values.'.$field->id, 'additional_values.'.$number->id]);
+        $payload['additional_values'] = [99999 => 'Unknown field'];
+        $this->postJson(route('hr.person.sections.store'), $payload)->assertUnprocessable();
+        $payload['additional_values'] = [$field->id => ''];
+        $this->postJson(route('hr.person.sections.store'), $payload)->assertOk();
+        $this->assertDatabaseHas('employee_additional_values', ['employee_id' => $id, 'employee_additional_field_id' => $field->id, 'value' => null]);
+        $this->withSession(['person_registration_ids' => []])->postJson(route('hr.person.sections.store'), $payload)->assertForbidden();
+    }
+
     public function test_documents_upload_download_reload_and_remove(): void
     {
         Storage::fake('employee_documents');
@@ -122,6 +143,46 @@ class EmployeeSectionSaveTest extends TestCase
         $this->assertCount(2, array_unique($photos));
         $this->assertCount(4, array_unique($documents));
         foreach ($photos as $path) Storage::disk('employee_photos')->assertExists($path);
+    }
+
+    public function test_probation_and_confirmation_dates_save_reload_and_preserve_probation_history(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $data = $this->basicData();
+        $data['employment_type'] = 'Probation';
+        $data['probation_end_date'] = '2027-01-28';
+        $id = $this->postJson(route('hr.person.sections.store'), $data)->assertOk()->json('id');
+        $this->getJson(route('hr.person.lookup', ['employee_id' => 'EMP001']))->assertOk()
+            ->assertJsonPath('employee.probation_end_date', '2027-01-28')->assertJsonPath('employee.confirmed_date', null);
+        $data['record_id'] = $id;
+        $data['employment_type'] = 'Permanent';
+        $data['probation_end_date'] = null;
+        $this->postJson(route('hr.person.sections.store'), $data)->assertUnprocessable()->assertJsonValidationErrors('confirmed_date');
+        $data['confirmed_date'] = '2026-10-29';
+        $this->postJson(route('hr.person.sections.store'), $data)->assertOk();
+        $this->getJson(route('hr.person.lookup', ['employee_id' => 'EMP001']))->assertOk()
+            ->assertJsonPath('employee.employment_type', 'Permanent')
+            ->assertJsonPath('employee.probation_end_date', '2027-01-28')
+            ->assertJsonPath('employee.confirmed_date', '2026-10-29');
+        $this->withoutVite()->get(route('hr.person.create', ['employee' => $id]))->assertOk()
+            ->assertSee('id="probation_end_date"', false)->assertSee('id="confirmed_date"', false);
+    }
+
+    public function test_employment_dates_reject_invalid_values_and_dates_before_joining(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $data = $this->basicData();
+        $data['employment_type'] = 'Probation';
+        $data['probation_end_date'] = 'not-a-date';
+        $this->postJson(route('hr.person.sections.store'), $data)->assertUnprocessable()->assertJsonValidationErrors('probation_end_date');
+        $data['probation_end_date'] = '2026-10-27';
+        $this->postJson(route('hr.person.sections.store'), $data)->assertUnprocessable()->assertJsonValidationErrors('probation_end_date');
+        $data['employment_type'] = 'Permanent';
+        $data['confirmed_date'] = '2026-10-27';
+        $this->postJson(route('hr.person.sections.store'), $data)->assertUnprocessable()->assertJsonValidationErrors('confirmed_date');
+        $data['confirmed_date'] = now('Asia/Colombo')->addDay()->toDateString();
+        $this->postJson(route('hr.person.sections.store'), $data)->assertUnprocessable()->assertJsonValidationErrors('confirmed_date');
+        $this->assertDatabaseCount('employees', 0);
     }
 
     private function basicData(): array

@@ -53,6 +53,5 @@
             @endforelse
         </div>
 
-        <x-page-footer />
     </section>
 </x-layouts.app>

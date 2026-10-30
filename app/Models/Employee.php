@@ -48,10 +48,17 @@ class Employee extends Model
     {
         return [
             'documents' => 'array',
+            'resigned_on' => 'date',
+            'onboarding_completed_at' => 'datetime',
             'bank_account_number' => 'encrypted',
             'probation_end_date' => 'date',
             'confirmed_date' => 'date',
         ];
+    }
+
+    public function employeeDocuments(): HasMany
+    {
+        return $this->hasMany(EmployeeDocument::class);
     }
 
     public function branch(): BelongsTo

@@ -2,7 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\{Branch, Department, Designation, Employee, User};
+use App\Models\Branch;
+use App\Models\Department;
+use App\Models\Designation;
+use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -12,12 +16,16 @@ class EmploymentHistoryTest extends TestCase
 
     private function employeeData(): array
     {
-        $this->actingAs(User::factory()->create());
+        $user = User::factory()->create();
+        $user->role = 'hr';
+        $user->save();
+        $this->actingAs($user);
         $branch = Branch::create(['branch_code' => 'HQ', 'name' => 'HQ']);
         $department = Department::create(['branch_id' => $branch->id, 'name' => 'HR']);
         $designation = Designation::create(['name' => 'Officer', 'is_active' => true]);
         $employee = Employee::create(['employee_id' => 'EMP001', 'first_name' => 'Test', 'last_name' => 'Employee',
             'branch_id' => $branch->id, 'department_id' => $department->id, 'joined_date' => '2020-01-01', 'employment_type' => 'Permanent']);
+
         return [$employee, ['branch_id' => $branch->id, 'department_id' => $department->id,
             'designation_id' => $designation->id, 'manager_id' => null, 'start_date' => '2020-01-01', 'change_reason' => 'Appointment']];
     }

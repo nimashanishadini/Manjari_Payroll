@@ -48,11 +48,12 @@
 
             @php
                 $tabs = [
-                    ['id' => 'basic', 'label' => 'Basic Information and Profile Photo'],
+                    ['id' => 'basic', 'label' => 'Basic Information '],
                     ['id' => 'private', 'label' => 'Private Information'],
                     ['id' => 'access', 'label' => 'Access Level'],
                     ['id' => 'schedule', 'label' => 'Schedule'],
                     ['id' => 'documents', 'label' => 'Documents & Qualifications'],
+                    ['id' => 'extra', 'label' => 'Additional Information'],
                     ['id' => 'employment', 'label' => 'Employment Details'],
                 ];
             @endphp
@@ -226,6 +227,17 @@
                                 @endforeach
                             </select>
                         </div>
+                        <div id="probationEndDateGroup" hidden class="grid gap-2 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center">
+                            <label for="probation_end_date" class="text-sm font-medium text-slate-700">Probation End Date</label>
+                            <input id="probation_end_date" name="probation_end_date" type="date" value="{{ old('probation_end_date') }}" disabled class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">
+                        </div>
+                        <div id="confirmedDateGroup" hidden class="grid gap-2 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center">
+                            <label for="confirmed_date" class="text-sm font-medium text-slate-700">Confirmed Date</label>
+                            <div>
+                                <input id="confirmed_date" name="confirmed_date" type="date" value="{{ old('confirmed_date') }}" max="{{ now('Asia/Colombo')->toDateString() }}" disabled class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm">
+                                <p class="mt-1 text-xs text-slate-500">Required when confirming an employee from Probation to Permanent.</p>
+                            </div>
+                        </div>
                         {{-- SELF SERVICE --}}
                         <div class="grid gap-2 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center">
 
@@ -299,6 +311,10 @@
 
                 </div>
 
+                @if(auth()->user()?->canManageEmploymentStructure())
+                    <p class="mt-6 text-xs text-slate-500">Manage dated designation, department and reporting manager assignments in <button type="button" onclick="openEmployeePositionAssignment()" class="font-semibold text-slate-700 underline">Employment Details</button> after saving or loading an employee.</p>
+                @endif
+                @include('hr.person.partials.employee-resignation')
             </section>
 
             {{-- REMAINING TABS --}}
@@ -312,14 +328,18 @@
                     class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
                 >
 
-                    <h2 class="text-lg font-bold text-slate-900">
-                        {{ $tab['label'] }}
-                    </h2>
+                    @if($tab['id'] !== 'documents')
+                        <h2 class="text-lg font-bold text-slate-900">
+                            {{ $tab['label'] }}
+                        </h2>
+                    @endif
 
                     @if($tab['id'] === 'private')
                         @include('hr.person.partials.private-information')
                     @elseif($tab['id'] === 'employment')
                         @include('hr.person.partials.employment-details')
+                    @elseif($tab['id'] === 'extra')
+                        @include('hr.person.partials.additional-information')
                     @elseif($tab['id'] === 'documents')
                         @include('hr.person.partials.documents-qualifications')
                     @else
@@ -377,7 +397,7 @@
                 id="saveEmployeeButton"
                 type="button"
                 onclick="saveEmployee()"
-                class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-500/20 transition hover:from-emerald-600 hover:to-green-700 sm:px-7"
+                class="erp-primary-action inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white sm:px-7"
             >
                 Save Basic Information
             </button>
@@ -388,6 +408,8 @@
 
 
 </div>
+
+@include('hr.person.partials.document-type-dialog')
 
 <script>
 
@@ -419,24 +441,189 @@ function populateEmployeeDocuments(documents) {
         list.replaceChildren();
         files.forEach(file => {
             const row = document.createElement('div');
-            row.className = 'flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs';
+            row.className = 'dq-saved-file';
+            row.dataset.documentFile = file.id;
             const link = document.createElement('a');
             link.href = file.url;
             link.textContent = file.name;
-            link.className = 'min-w-0 break-all font-medium text-slate-700 underline hover:text-rose-600';
+            link.className = 'min-w-0 break-all font-medium text-slate-700 underline hover:text-slate-900';
             const label = document.createElement('label');
-            label.className = 'flex shrink-0 items-center gap-1.5 text-rose-600';
+            label.className = 'dq-remove';
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.name = 'remove_documents[]';
             checkbox.value = file.id;
             label.append(checkbox, document.createTextNode('Remove'));
-            row.append(link, label);
+            row.append(link);
+            if (card.dataset.requiresExpiry === '1') {
+                const expiry = document.createElement('input');
+                expiry.type = 'date';
+                expiry.name = `document_expiry[${file.id}]`;
+                expiry.value = file.expires_on ?? '';
+                expiry.setAttribute('aria-label', `Expiry date for ${file.name}`);
+                expiry.className = 'min-w-0 rounded border-slate-300 text-xs';
+                const expiryLabel = document.createElement('label');
+                expiryLabel.className = 'text-xs text-slate-500';
+                expiryLabel.append(document.createTextNode('Expiry date'), expiry);
+                row.classList.add('flex-wrap');
+                row.append(expiryLabel);
+            }
+            row.append(label);
             list.append(row);
         });
         card.querySelector('input[type="file"]').value = '';
+        const uploadExpiry = card.querySelector('[data-upload-expiry]');
+        if (uploadExpiry) uploadExpiry.value = '';
         card.querySelector('[data-file-selection]').textContent = '';
     });
+    refreshDocumentChecklist();
+}
+
+function openDocumentTypeSettings() {
+    const dialog = document.getElementById('documentTypeSettingsDialog');
+    if (!dialog) return;
+    dialog.querySelectorAll('[data-document-type-employee]').forEach(input => input.value = employeeRecordId ?? '');
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'documents');
+    window.history.replaceState(null, '', url);
+    dialog.showModal();
+}
+
+function selectDocumentType(code) {
+    const picker = document.getElementById('documentTypePicker');
+    const selected = Array.from(picker.options).find(option => option.value === code);
+    if (!selected) return;
+    document.querySelectorAll('[name="document_category_picker"]').forEach(radio => {
+        radio.checked = radio.value === selected.dataset.pickerGroup;
+    });
+    filterDocumentTypes(code);
+}
+
+function filterDocumentTypes(preferred = null) {
+    const group = document.querySelector('[name="document_category_picker"]:checked')?.value;
+    const picker = document.getElementById('documentTypePicker');
+    const available = Array.from(picker.options).filter(option => option.dataset.pickerGroup === group);
+    for (const option of picker.options) {
+        option.hidden = option.dataset.pickerGroup !== group;
+        option.disabled = option.hidden;
+    }
+    picker.value = available.some(option => option.value === preferred) ? preferred : (available[0]?.value ?? '');
+    picker.hidden = !available.length;
+    document.getElementById('documentTypeEmpty').hidden = available.length > 0;
+    showDocumentEditor();
+}
+
+function showDocumentEditor() {
+    const code = document.getElementById('documentTypePicker').value;
+    document.querySelectorAll('[data-document-category]').forEach(card => card.hidden = card.dataset.documentCategory !== code);
+    document.querySelectorAll('[data-checklist-type]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.checklistType === code)));
+}
+
+function refreshDocumentChecklist() {
+    const list = document.getElementById('documentChecklist');
+    list.replaceChildren();
+    let total = 0;
+    document.querySelectorAll('[data-document-category]').forEach(card => {
+        const count = card.querySelectorAll('[data-saved-documents] > div').length;
+        total += count;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.checklistType = card.dataset.documentCategory;
+        const name = document.createElement('span');
+        name.textContent = card.querySelector('.dq-type-title').childNodes[0].textContent.trim();
+        const number = document.createElement('span');
+        number.textContent = count;
+        button.append(name, number);
+        button.addEventListener('click', () => selectDocumentType(card.dataset.documentCategory));
+        list.append(button);
+    });
+    document.getElementById('documentSavedTotal').textContent = total;
+    showDocumentEditor();
+}
+
+function populateOnboarding(status) {
+    const label = document.getElementById('onboardingStatus');
+    const button = document.getElementById('completeOnboarding');
+    if (!status) {
+        label.textContent = 'Save or load an employee to check onboarding documents.';
+        button.disabled = true;
+        return;
+    }
+    label.textContent = status.completed ? 'Onboarding completed.' : (status.can_complete ? 'Mandatory documents are ready. You can complete onboarding.' : 'Onboarding blocked. Valid documents needed: ' + status.blocking_types.join(', '));
+    button.disabled = status.completed || !status.can_complete;
+}
+
+async function completeEmployeeOnboarding() {
+    if (!employeeRecordId || employeeSaving) return;
+    const button = document.getElementById('completeOnboarding');
+    button.disabled = true;
+    employeeSaving = true;
+    try {
+        const response = await fetch({{ Illuminate\Support\Js::from(url('/hr/person/add-employee')) }} + '/' + employeeRecordId + '/complete-onboarding', {
+            method: 'POST', headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content}
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(Object.values(result.errors ?? {}).flat().join(' ') || result.message || 'Unable to complete onboarding.');
+        populateOnboarding(result.onboarding);
+    } catch (error) {
+        document.getElementById('onboardingStatus').textContent = error.message;
+        button.disabled = false;
+    } finally {
+        employeeSaving = false;
+    }
+}
+
+function populateEmployeeCertificates(documents = {}) {
+    const list = document.getElementById('employeeCertificatesResult');
+    list.replaceChildren();
+    const types = @json($documentTypes->map->only(['code', 'name', 'requires_expiry'])->values());
+    let submittedTypes = 0;
+    let copies = 0;
+    for (const type of types) {
+        const category = documents[type.code] ?? {};
+        const files = category.files ?? [];
+        const submitted = files.length > 0;
+        if (submitted) submittedTypes++;
+        copies += files.length;
+        const card = document.createElement('article');
+        card.className = 'min-w-0 rounded-lg border border-slate-200 bg-white p-3';
+        const header = document.createElement('div');
+        header.className = 'flex flex-wrap items-center justify-between gap-2';
+        const title = document.createElement('h4');
+        title.className = 'text-xs font-semibold text-slate-800';
+        title.textContent = type.name;
+        const badge = document.createElement('span');
+        badge.className = submitted ? 'rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700' : 'rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700';
+        badge.textContent = submitted ? '✓ Submitted' : 'Not submitted';
+        header.append(title, badge);
+        card.append(header);
+        const qualification = category.qualification;
+        if (qualification) {
+            const details = document.createElement('p');
+            details.className = 'mt-2 whitespace-pre-wrap break-words text-xs text-slate-500';
+            details.textContent = [qualification.institution, qualification.year, qualification.details].filter(Boolean).join(' · ');
+            if (details.textContent) card.append(details);
+        }
+        for (const file of files) {
+            const row = document.createElement('div');
+            row.className = 'mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2';
+            const link = document.createElement('a');
+            link.href = file.url;
+            link.className = 'min-w-0 break-all text-xs font-medium text-slate-600 underline hover:text-slate-900';
+            link.textContent = file.name;
+            link.setAttribute('aria-label', `Download ${file.name}`);
+            row.append(link);
+            if (type.requires_expiry && file.expires_on) {
+                const expiry = document.createElement('span');
+                expiry.className = 'text-xs text-slate-500';
+                expiry.textContent = 'Expiry: ' + file.expires_on;
+                row.append(expiry);
+            }
+            card.append(row);
+        }
+        list.append(card);
+    }
+    document.getElementById('employeeCertificatesSummary').textContent = `${submittedTypes} of ${types.length} document types submitted · ${copies} file${copies === 1 ? '' : 's'}`;
 }
 
 async function viewEmploymentDetails() {
@@ -449,6 +636,8 @@ async function viewEmploymentDetails() {
     result.hidden = true;
     result.querySelectorAll('[data-employment-detail]').forEach(field => field.textContent = '');
     document.getElementById('employmentHistoryResult').replaceChildren();
+    document.getElementById('employeeCertificatesResult').replaceChildren();
+    document.getElementById('employeeCertificatesSummary').textContent = '';
     if (!id) {
         status.textContent = 'Enter an Employee ID.';
         return;
@@ -467,15 +656,8 @@ async function viewEmploymentDetails() {
         const {employee} = await response.json();
         if (version !== employmentLookupVersion) return;
         historyEmployee = employee;
-        document.getElementById('employmentHistoryForm').reset();
-        document.getElementById('historyEnd').disabled = false;
-        document.getElementById('historyEnd').min = '';
-        filterHistoryDepartments();
-        document.getElementById('historySaveStatus').textContent = '';
-        document.getElementById('historyStart').min = employee.joined_date?.slice(0, 10) ?? '';
-        document.querySelectorAll('#historyManager option[value]').forEach(option => {
-            option.disabled = option.value === String(employee.id);
-        });
+        populateEmploymentPeriodForm(employee);
+        populateEmployeeCertificates(employee.documents ?? {});
         const photo = document.getElementById('employmentDetailsPhoto');
         photo.hidden = !employee.photo_url;
         if (employee.photo_url) photo.src = employee.photo_url;
@@ -489,6 +671,7 @@ async function viewEmploymentDetails() {
         if (!employee.employment_history?.length) history.textContent = 'No employment history recorded.';
         for (const item of employee.employment_history ?? []) {
             const row = document.createElement('p');
+            row.className = 'rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-6';
             row.textContent = `${item.start_date ?? '—'} – ${item.end_date ?? 'Present'} | ${item.department ?? '—'} | ${item.designation ?? '—'} | Manager: ${item.manager ?? '—'} | ${item.change_reason ?? ''}`;
             history.appendChild(row);
         }
@@ -496,6 +679,68 @@ async function viewEmploymentDetails() {
         result.hidden = false;
     } catch {
         if (version === employmentLookupVersion) status.textContent = 'Unable to load employee details. Please try again.';
+    }
+}
+
+function populateEmploymentPeriodForm(employee) {
+    const form = document.getElementById('employmentPeriodForm');
+    if (!form) return;
+    document.getElementById('employmentPeriodEditor').hidden = employee.status === 'Resigned';
+    form.reset();
+    document.getElementById('historySaveStatus').textContent = '';
+    const current = employee.employment_history?.find(period => !period.end_date);
+    const action = document.getElementById('historyAction');
+    action.querySelector('[value="initial"]').disabled = Boolean(current);
+    action.querySelector('[value="transfer"]').disabled = !current;
+    action.value = current ? 'transfer' : 'initial';
+    document.getElementById('historyBranch').value = employee.branch_id ?? '';
+    filterHistoryDepartments();
+    document.getElementById('historyDepartment').value = employee.department_id ?? '';
+    for (const option of document.getElementById('historyManager').options) {
+        option.disabled = option.value === String(employee.id);
+        option.hidden = option.disabled;
+    }
+    document.getElementById('historyManager').value = employee.line_manager_id ?? '';
+    configureHistoryAction();
+}
+
+function configureHistoryAction() {
+    if (!historyEmployee) return;
+    const action = document.getElementById('historyAction').value;
+    const current = historyEmployee.employment_history?.find(period => !period.end_date);
+    const historical = action === 'historical';
+    const end = document.getElementById('historyEndDate');
+    document.getElementById('historyEndDateGroup').hidden = !historical;
+    end.disabled = !historical;
+    end.required = historical;
+    end.value = '';
+    const start = document.getElementById('historyStartDate');
+    start.min = historyEmployee.joined_date?.slice(0, 10) ?? '';
+    if (action === 'transfer' && current) {
+        const nextDay = new Date(current.start_date + 'T00:00:00Z');
+        nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+        start.min = nextDay.toISOString().slice(0, 10);
+    }
+    start.value = action === 'initial' ? (historyEmployee.joined_date?.slice(0, 10) ?? '') : '';
+    document.getElementById('historyReason').value = action === 'initial' ? 'Initial appointment' : '';
+    const designation = document.getElementById('historyDesignation');
+    for (const option of designation.options) {
+        const retained = action === 'transfer' && option.value === String(current?.designation_id);
+        option.disabled = option.value !== '' && option.dataset.active !== '1' && !retained;
+        option.hidden = option.disabled;
+    }
+    designation.value = action === 'transfer' ? String(current?.designation_id ?? '') : '';
+}
+
+async function openEmployeePositionAssignment() {
+    if (!employeeRecordId || employeeSaving) return;
+    showEmployeeTab('employment');
+    document.getElementById('employmentLookupId').value = document.getElementById('employee_id').value.trim();
+    await viewEmploymentDetails();
+    const editor = document.getElementById('employmentPeriodEditor');
+    if (editor && historyEmployee && !editor.hidden) {
+        editor.open = true;
+        editor.scrollIntoView({block: 'nearest', behavior: 'smooth'});
     }
 }
 
@@ -536,6 +781,11 @@ async function saveEmploymentPeriod(event) {
             return;
         }
         await viewEmploymentDetails();
+        if (historyEmployee && employeeRecordId === employee.id) {
+            document.getElementById('employee_branch').value = historyEmployee.branch_id;
+            filterBranchDepartments();
+            document.getElementById('employee_department').value = historyEmployee.department_id;
+        }
         document.getElementById('historySaveStatus').textContent = 'Employment period saved successfully.';
     } catch {
         status.textContent = 'Unable to save. Check your connection and try again.';
@@ -546,7 +796,20 @@ async function saveEmploymentPeriod(event) {
     }
 }
 
+function setBankAccountVisibility(visible) {
+    const input = document.getElementById('bank_account_number');
+    const button = document.getElementById('toggleBankAccountNumber');
+    if (!input || !button) return;
+    input.type = visible ? 'text' : 'password';
+    button.setAttribute('aria-pressed', String(visible));
+    const label = visible ? 'Hide account number' : 'Show account number';
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    document.getElementById('bankAccountEyeSlash').style.display = visible ? '' : 'none';
+}
+
 function clearBankFields() {
+    setBankAccountVisibility(false);
     bankRequestVersion++;
     for (const id of ['bank_name', 'bank_branch', 'bank_account_name', 'bank_account_number', 'bank_password']) {
         const input = document.getElementById(id);
@@ -593,17 +856,103 @@ async function loadEmployeeBankDetails() {
     }
 }
 
+let resignationEmployee = null;
+let resignationSaving = false;
+
+function populateEmployeeResignation(employee) {
+    const button = document.getElementById('openResignation');
+    if (!button) return;
+    resignationEmployee = employee?.id ? employee : null;
+    const resigned = employee?.status === 'Resigned';
+    document.getElementById('basicEmploymentStatus').textContent = employee?.id ? (employee.status || 'Active') : 'New employee';
+    document.getElementById('basicEmploymentStatus').className = 'ml-2 rounded-full px-2 py-1 text-xs ' + (resigned ? 'bg-red-100 text-red-700' : 'bg-white text-slate-600');
+    button.disabled = !resignationEmployee || resigned;
+    document.getElementById('resignationHint').textContent = resigned
+        ? `Resigned on ${employee.resigned_on ? employee.resigned_on.slice(0, 10) : '—'}. ${employee.resignation_reason ?? ''}`
+        : (resignationEmployee ? 'Admin access: record this employee’s resignation.' : 'Load an employee to record their resignation.');
+}
+
+function openEmployeeResignation() {
+    if (!resignationEmployee || employeeSaving || resignationSaving) return;
+    if (document.getElementById('employee_id').value.trim() !== resignationEmployee.employee_id) return;
+    document.getElementById('employeeResignationForm').reset();
+    document.getElementById('employeeResignedOn').min = resignationEmployee.joined_date?.slice(0, 10) ?? '';
+    document.getElementById('employeeResignationError').textContent = '';
+    document.getElementById('resigningEmployeeName').textContent = `${resignationEmployee.name || resignationEmployee.first_name} · ${resignationEmployee.employee_id}`;
+    document.getElementById('employeeResignationDialog').showModal();
+}
+
+async function submitEmployeeResignation(event) {
+    event.preventDefault();
+    if (!resignationEmployee || resignationSaving || employeeSaving) return;
+    const employee = resignationEmployee;
+    if (document.getElementById('employee_id').value.trim() !== employee.employee_id) return;
+    const error = document.getElementById('employeeResignationError');
+    const button = document.getElementById('confirmResignation');
+    const cancel = document.getElementById('cancelResignation');
+    button.disabled = true;
+    cancel.disabled = true;
+    employeeSaving = true;
+    resignationSaving = true;
+    error.textContent = '';
+    try {
+        const template = @json(route('hr.person.employees.resign', 0));
+        const response = await fetch(template.replace('/0/resign', '/' + employee.id + '/resign'), {
+            method: 'POST', headers: {'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content},
+            body: JSON.stringify({resigned_on: document.getElementById('employeeResignedOn').value, resignation_reason: document.getElementById('employeeResignationReason').value.trim()})
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(Object.values(result.errors ?? {}).flat().join(' ') || result.message || 'Unable to record resignation.');
+        populateEmployeeResignation({...employee, ...result});
+        const selfService = document.querySelector('[name="allow_self_service"]');
+        if (selfService) selfService.checked = false;
+        document.getElementById('employeeResignationDialog').close();
+        document.getElementById('employeeSaveStatus').textContent = result.message;
+    } catch (failure) {
+        error.textContent = failure.message;
+    } finally {
+        employeeSaving = false;
+        resignationSaving = false;
+        button.disabled = false;
+        cancel.disabled = false;
+    }
+}
+
+let loadedEmploymentType = savedEmployee?.employment_type ?? null;
+
+function updateEmploymentDateFields() {
+    const type = document.getElementById('employment_type').value;
+    const joined = document.getElementById('joined_date').value;
+    for (const [field, group, applicable] of [
+        ['probation_end_date', 'probationEndDateGroup', type === 'Probation'],
+        ['confirmed_date', 'confirmedDateGroup', type === 'Permanent'],
+    ]) {
+        const input = document.getElementById(field);
+        document.getElementById(group).hidden = !applicable;
+        input.disabled = !applicable;
+        input.min = joined;
+    }
+    document.getElementById('confirmed_date').required = type === 'Permanent' && loadedEmploymentType === 'Probation';
+}
+
 function populateEmployeeDetails(employee) {
+    loadedEmploymentType = employee.employment_type ?? null;
+    populateEmployeeResignation(employee);
     clearBankFields();
     clearEmployeePhoto();
     photoRemoved = false;
     document.querySelectorAll('[data-employee-panel] [name]').forEach(input => {
-        if (input.type === 'file') return;
+        if (input.type === 'file' || input.type === 'radio') return;
         if (input.type === 'checkbox') input.checked = Boolean(Number(employee[input.name]));
-        else input.value = employee[input.name] ?? '';
+        else input.value = input.type === 'date' ? String(employee[input.name] ?? '').slice(0, 10) : (employee[input.name] ?? '');
         input.setCustomValidity('');
     });
+    document.querySelectorAll('[data-additional-field]').forEach(input => {
+        input.value = employee.additional_values?.[input.dataset.additionalField] ?? '';
+    });
+    updateEmploymentDateFields();
     populateEmployeeDocuments(employee.documents ?? {});
+        populateOnboarding(employee.onboarding);
     filterBranchDepartments();
     if (employee.photo_url) {
         const preview = document.getElementById('employeePhotoPreview');
@@ -798,7 +1147,7 @@ function updateEmployeeFooter() {
     previousButton.classList.toggle('hidden', isFirst);
     previousButton.classList.toggle('inline-flex', !isFirst);
 
-    const available = ['basic', 'private', 'documents'].includes(currentEmployeeTab);
+    const available = ['basic', 'private', 'documents', 'extra'].includes(currentEmployeeTab);
     saveButton.style.display = available ? 'inline-flex' : 'none';
     saveButton.textContent = 'Save ' + document.getElementById('tab-' + currentEmployeeTab).textContent.trim();
 
@@ -820,17 +1169,34 @@ async function saveEmployee() {
     if (employeeSaving || !validateEmployeeIdentity()) return;
     if (!await lookupEmployeeDetails() || employeeSaving) return;
     const section = currentEmployeeTab;
-    if (section === 'documents') {
-        for (const input of document.querySelectorAll('#panel-documents input, #panel-documents textarea')) {
+    if (section === 'basic') {
+        for (const id of ['probation_end_date', 'confirmed_date']) {
+            const input = document.getElementById(id);
+            if (!input.disabled && !input.reportValidity()) return;
+        }
+    }
+    if (section === 'extra') {
+        for (const input of document.querySelectorAll('#panel-extra [data-additional-field]')) {
             if (!input.reportValidity()) return;
         }
     }
-    if (!['basic', 'private', 'documents'].includes(section)) return;
+    if (section === 'documents') {
+        for (const input of document.querySelectorAll('#panel-documents input, #panel-documents textarea')) {
+            if (!input.checkValidity()) {
+                const card = input.closest('[data-document-category]');
+                if (card) selectDocumentType(card.dataset.documentCategory);
+                input.reportValidity();
+                return;
+            }
+        }
+    }
+    if (!['basic', 'private', 'documents', 'extra'].includes(section)) return;
     const status = document.getElementById('employeeSaveStatus');
     const data = new FormData();
     data.append('section', section);
     if (employeeRecordId) data.append('record_id', employeeRecordId);
     for (const input of document.getElementById('panel-' + section).querySelectorAll('input[name], select[name], textarea[name]')) {
+        if (input.disabled) continue;
         if (input.type === 'file') {
             for (const file of input.files) data.append(input.name, file);
         } else {
@@ -868,7 +1234,7 @@ async function saveEmployee() {
         }
         status.textContent = document.getElementById('tab-' + section).textContent.trim() + ' saved successfully.';
         if (section === 'private') clearBankFields();
-        if (section === 'documents') populateEmployeeDocuments(result.documents ?? {});
+        if (section === 'documents') { populateEmployeeDocuments(result.documents ?? {}); populateOnboarding(result.onboarding); }
     } catch {
         status.textContent = 'Unable to save. Please check your connection and try again.';
     } finally {
@@ -879,17 +1245,6 @@ async function saveEmployee() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('employmentHistoryForm').addEventListener('submit', saveEmploymentPeriod);
-    document.getElementById('historyBranch').addEventListener('change', filterHistoryDepartments);
-    document.getElementById('historyStart').addEventListener('change', function () {
-        document.getElementById('historyEnd').min = this.value;
-    });
-    document.getElementById('historyAction').addEventListener('change', function () {
-        const end = document.getElementById('historyEnd');
-        end.disabled = this.value === 'transfer';
-        if (end.disabled) end.value = '';
-    });
-    filterHistoryDepartments();
     document.getElementById('employmentDetailsSearch').addEventListener('submit', function (event) {
         event.preventDefault();
         viewEmploymentDetails();
@@ -901,6 +1256,9 @@ document.addEventListener('DOMContentLoaded', function () {
         clearTimeout(employmentLookupTimer);
         if (this.value.trim()) employmentLookupTimer = setTimeout(viewEmploymentDetails, 500);
     });
+    document.querySelectorAll('[name="document_category_picker"]').forEach(radio => radio.addEventListener('change', () => filterDocumentTypes()));
+    document.getElementById('documentTypePicker').addEventListener('change', showDocumentEditor);
+    filterDocumentTypes();
     populateEmployeeDocuments(@json($employeeDocuments));
     document.querySelectorAll('[data-document-category] input[type="file"]').forEach(input => {
         input.addEventListener('change', () => {
@@ -933,8 +1291,10 @@ document.addEventListener('DOMContentLoaded', function () {
             lookupEmployeeDetails();
         }
     });
+    populateOnboarding(@js($onboarding));
     document.getElementById('employeePhoto').addEventListener('change', previewEmployeePhoto);
     document.getElementById('employee_branch').addEventListener('change', filterBranchDepartments);
+    populateEmployeeResignation(savedEmployee);
     if (savedEmployee) {
         if (savedEmployee.profile_photo) {
             const preview = document.getElementById('employeePhotoPreview');
@@ -946,16 +1306,40 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('[data-employee-panel] [name]').forEach(input => {
             if (input.type === 'file' || savedEmployee[input.name] == null) return;
             if (input.type === 'checkbox') input.checked = Boolean(Number(savedEmployee[input.name]));
-            else input.value = savedEmployee[input.name];
+            else input.value = input.type === 'date' ? String(savedEmployee[input.name]).slice(0, 10) : savedEmployee[input.name];
         });
     }
-    filterBranchDepartments();
+    updateEmploymentDateFields();
+    document.getElementById('employment_type').addEventListener('change', updateEmploymentDateFields);
+    document.getElementById('joined_date').addEventListener('change', updateEmploymentDateFields);
     for (const id of ['employee_id', 'employee_name']) {
         document.getElementById(id).addEventListener('input', function () {
             this.setCustomValidity('');
         });
     }
-    showEmployeeTab('basic');
+    const requestedTab = new URL(window.location.href).searchParams.get('tab');
+    showEmployeeTab(employeeTabIds.includes(requestedTab) ? requestedTab : 'basic');
+    if (@json(old('document_type_context') === 'registration')) openDocumentTypeSettings();
+    const destination = new URL(window.location.href).searchParams;
+    const requestedDocumentType = destination.get('document_type');
+    const requestedDocumentFile = destination.get('document_file');
+    function revealNotificationDocument() {
+        if (!requestedDocumentType) return;
+        showEmployeeTab('documents');
+        selectDocumentType(requestedDocumentType);
+        const file = Array.from(document.querySelectorAll('[data-document-file]')).find(row => row.dataset.documentFile === requestedDocumentFile);
+        if (file) {
+            file.style.outline = '2px solid #94a3b8';
+            file.style.outlineOffset = '2px';
+            file.scrollIntoView({block: 'center', behavior: 'smooth'});
+        }
+    }
+    if (savedEmployee) revealNotificationDocument();
+    const lookup = new URL(window.location.href).searchParams.get('lookup');
+    if (lookup && !savedEmployee) {
+        employeeIdInput.value = lookup;
+        lookupEmployeeDetails().then(() => { showEmployeeTab('documents'); revealNotificationDocument(); });
+    }
 });
 
 </script>

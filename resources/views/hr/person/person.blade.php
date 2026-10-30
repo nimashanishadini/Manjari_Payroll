@@ -14,7 +14,7 @@
     grid-template-columns: 240px minmax(0, 1fr);
     width: 100%;
     min-width: 0;
-    height: calc(100dvh - 54px);
+    height: 100%;
     overflow: hidden;
 }
 
@@ -189,7 +189,7 @@
                     <p class="person-org-subtitle">Branches &amp; Departments</p>
                 </div> --}}
                 {{-- <button type="button" onclick="openPersonModal('departmentModal')"
-                    class="person-action person-action--blue" title="Add Department">+ Department</button> --}}
+                    class="person-action erp-primary-action" title="Add Department">+ Department</button> --}}
             </div>
             <input id="branchSearch" type="search" placeholder="Search branches..."
                 class="mt-4 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-rose-500"
@@ -288,10 +288,10 @@
                 <span class="person-toolbar-divider" aria-hidden="true"></span>
             <div class="person-hero-actions">
                 <button type="button" onclick="openPersonModal('departmentModal')"
-                    class="person-action person-action--blue">+ Add Department</button>
+                    class="person-action erp-primary-action">+ Add Department</button>
                 <a
     href="{{ route('hr.person.create') }}"
-    class="person-action person-action--rose"
+    class="person-action erp-primary-action"
 >
     + Add Employee
 </a>
@@ -445,7 +445,7 @@
         <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold
             {{ $isActive
                 ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-slate-100 text-slate-600' }}">
+                : (strtolower($employee->status ?? '') === 'resigned' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600') }}">
             {{ $employee->status ?: 'Active' }}
         </span>
     </td>
@@ -538,7 +538,7 @@
                 <button type="button" onclick="closePersonModal('departmentModal')" class="rounded-lg border px-5 py-2.5 text-sm">
                     Cancel
                 </button>
-                <button type="submit" class="rounded-lg bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-rose-700">
+                <button type="submit" class="erp-primary-action rounded-lg px-5 py-2.5 text-sm font-semibold text-white">
                     Save Department
                 </button>
             </div>
@@ -725,7 +725,7 @@
                 <button type="button" onclick="closePersonModal('employeeModal')" class="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium">
                     Cancel
                 </button>
-                <button type="submit" class="rounded-lg bg-rose-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-rose-700">
+                <button type="submit" class="erp-primary-action rounded-lg px-6 py-2.5 text-sm font-semibold text-white">
                     Save Employee
                 </button>
             </div>

@@ -72,10 +72,10 @@ Route::get('/payroll', function () {
 Route::prefix('hr/person')
     ->name('hr.person.')
     ->group(function () {
-Route::view('/resigned', 'hr.person.resigned')->name('resigned');
+Route::get('/resigned', [\App\Http\Controllers\Hr\EmployeeResignationController::class, 'index'])->middleware('auth')->name('resigned');
 Route::view('/to-be-reviewed', 'hr.person.to-be-reviewed')->name('to-be-reviewed');
-Route::view('/position-management', 'hr.person.position-management')->name('position-management');
-Route::view('/additional-information', 'hr.person.additional-information')->name('additional-information');
+Route::get('/position-management', [\App\Http\Controllers\Hr\PositionManagementController::class, 'index'])->middleware('auth')->name('position-management');
+
     });
 Route::get('/hr/person', [
     \App\Http\Controllers\Hr\PersonPageController::class,
@@ -133,4 +133,33 @@ Route::middleware('auth')->prefix('hr/person/employees/{employeeId}/history')->n
     Route::get('/', [EmploymentHistoryController::class, 'index'])->name('index');
     Route::post('/', [EmploymentHistoryController::class, 'store'])->name('store');
     Route::post('/transfer', [EmploymentHistoryController::class, 'transfer'])->name('transfer');
+});
+
+Route::middleware('auth')->prefix('hr/person/additional-information')->name('hr.person.additional-information')->controller(\App\Http\Controllers\Hr\AdditionalInformationController::class)->group(function () {
+    Route::get('/', 'index');
+    Route::post('/', 'store')->name('.store');
+    Route::put('/{field}', 'update')->name('.update');
+    Route::delete('/{field}', 'destroy')->name('.destroy');
+});
+
+Route::middleware('auth')->prefix('hr/person')->name('hr.person.')->group(function () {
+    Route::get('/document-types', [\App\Http\Controllers\Hr\DocumentTypeController::class, 'index'])->name('document-types.index');
+    Route::post('/document-types', [\App\Http\Controllers\Hr\DocumentTypeController::class, 'store'])->name('document-types.store');
+    Route::put('/document-types/{type}', [\App\Http\Controllers\Hr\DocumentTypeController::class, 'update'])->name('document-types.update');
+    Route::get('/system-alarms', [\App\Http\Controllers\Hr\SystemAlarmController::class, 'index'])->name('system-alarms.index');
+    Route::post('/add-employee/{employee}/complete-onboarding', [\App\Http\Controllers\Hr\PersonPageController::class, 'completeOnboarding'])->name('onboarding.complete');
+});
+
+Route::post('/hr/person/employees/{employee}/resign', [\App\Http\Controllers\Hr\EmployeeResignationController::class, 'store'])
+    ->middleware('auth')->name('hr.person.employees.resign');
+
+Route::middleware('auth')->prefix('hr/person/position-management')->name('hr.person.positions.')->group(function () {
+    Route::post('/', [\App\Http\Controllers\Hr\PositionManagementController::class, 'store'])->name('store');
+    Route::put('/{designation}', [\App\Http\Controllers\Hr\PositionManagementController::class, 'update'])->name('update');
+    Route::delete('/{designation}', [\App\Http\Controllers\Hr\PositionManagementController::class, 'destroy'])->name('destroy');
+});
+
+Route::middleware('auth')->prefix('hr/person/notifications')->name('hr.person.notifications.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Hr\AlarmNotificationController::class, 'index'])->name('index');
+    Route::post('/{alarm}/open', [\App\Http\Controllers\Hr\AlarmNotificationController::class, 'open'])->name('open');
 });

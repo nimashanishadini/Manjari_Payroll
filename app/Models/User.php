@@ -10,6 +10,16 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
+    public function canManageEmploymentStructure(): bool
+    {
+        return in_array($this->role, ['hr', 'admin'], true);
+    }
+
+    public function canManageEmployeeDocuments(): bool
+    {
+        return in_array($this->role, ['hr', 'admin'], true);
+    }
+
     public function canManageEmployeeBankDetails(): bool
     {
         return in_array($this->role, ['hr', 'admin'], true);

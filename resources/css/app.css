@@ -18,3 +18,26 @@
     --color-corporate-red-light: #fdf2f2;
     --color-corporate-red-border: #fecaca;
 }
+
+/* Primary employee actions use the sidebar's red and burgundy palette. */
+.erp-primary-action {
+    background: linear-gradient(110deg, #f10f32 0%, #5b111e 100%);
+    color: #fff;
+    box-shadow: 0 5px 14px rgb(241 15 50 / 18%);
+    transition: filter .2s, box-shadow .2s;
+}
+
+.erp-primary-action:hover:not(:disabled) {
+    filter: brightness(.94);
+    box-shadow: 0 6px 18px rgb(241 15 50 / 25%);
+}
+
+.erp-primary-action:focus-visible {
+    outline: 2px solid #f10f32;
+    outline-offset: 3px;
+}
+
+.erp-primary-action:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
