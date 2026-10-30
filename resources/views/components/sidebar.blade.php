@@ -6,12 +6,12 @@
         
 'person' => [
     [
-        'label' => 'Person Management',
+        'label' => 'Employee Management',
         'type' => 'dropdown',
         'icon' => 'users',
         'children' => [
             [
-            'label' => 'Person',
+            'label' => 'Employees',
             'route' => 'hr.person.index',
             'icon' => 'users',
         ],

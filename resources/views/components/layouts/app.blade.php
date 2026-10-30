@@ -532,10 +532,71 @@ body {
     }
 }
         }
+
+        /* Reserve footer space; only the content pane scrolls. */
+        .erp-app-body {
+            height: 100dvh;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .erp-app-body > .erp-header { flex-shrink: 0; }
+        .erp-app-body .erp-frame {
+            flex: 1 1 0%;
+            min-height: 0;
+            min-width: 0;
+            max-width: 100%;
+            overflow: hidden;
+        }
+        .erp-app-body .erp-main {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 0%;
+            width: 0;
+            min-width: 0;
+            min-height: 0;
+            max-width: 100%;
+            overflow: hidden;
+        }
+        .erp-page-content {
+            flex: 1 1 0%;
+            min-height: 0;
+            min-width: 0;
+            overflow: auto;
+        }
+        .erp-page-footer {
+            flex: none;
+            min-width: 0;
+            padding: 10px 16px;
+            border-top: 1px solid #e2e8f0;
+            background: #fff;
+        }
+        .erp-page-footer > footer { margin-top: 0; }
+        .erp-app-body .erp-frame > .erp-side {
+            height: 100%;
+            min-height: 0;
+            position: relative;
+            top: 0;
+            overflow: hidden;
+        }
+        @media (max-width: 700px) {
+            .erp-app-body .erp-frame { display: flex; flex-direction: column; }
+            .erp-app-body .erp-main { width: 100%; }
+            .erp-app-body .erp-frame > .erp-side {
+                width: 100%;
+                min-width: 100%;
+                height: auto;
+                max-height: 35dvh;
+                flex-shrink: 0;
+            }
+            .erp-page-footer { padding: 6px 10px; }
+            .erp-page-footer > footer { padding: 8px 12px; gap: 6px; }
+        }
     </style>
 </head>
 
-<body>
+<body @auth class="erp-app-body" @endauth>
 
 @auth
 
@@ -756,6 +817,8 @@ body {
              LOGGED IN USER
         ======================================= -->
 
+        <x-alarm-notifications />
+
         <div class="erp-user">
 
             <div class="erp-user-avatar">
@@ -801,7 +864,13 @@ body {
 
         <main class="erp-main">
 
-            {{ $slot }}
+            <div class="erp-page-content">
+                {{ $slot }}
+            </div>
+
+            <div class="erp-page-footer">
+                <x-page-footer />
+            </div>
 
         </main>
 

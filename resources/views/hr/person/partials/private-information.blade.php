@@ -37,9 +37,20 @@
             @foreach(['bank_name' => 'Bank Name', 'bank_branch' => 'Bank Branch', 'bank_account_name' => 'Account Holder Name', 'bank_account_number' => 'Account Number'] as $field => $label)
                 <div>
                     <label for="{{ $field }}" class="mb-2 block text-sm font-medium text-slate-700">{{ $label }}</label>
-                    <input id="{{ $field }}" name="{{ $field }}" type="{{ $field === 'bank_account_number' ? 'password' : 'text' }}" autocomplete="off"
-                           @if($field === 'bank_account_number') inputmode="numeric" maxlength="34" @else maxlength="{{ $field === 'bank_account_name' ? 255 : 150 }}" @endif
-                           class="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm">
+                    <div class="relative">
+                        <input id="{{ $field }}" name="{{ $field }}" type="{{ $field === 'bank_account_number' ? 'password' : 'text' }}" autocomplete="off"
+                               @if($field === 'bank_account_number') inputmode="numeric" maxlength="34" @else maxlength="{{ $field === 'bank_account_name' ? 255 : 150 }}" @endif
+                               class="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm {{ $field === 'bank_account_number' ? 'pr-12' : '' }}">
+                        @if($field === 'bank_account_number')
+                            <button type="button" id="toggleBankAccountNumber" onclick="setBankAccountVisibility(document.getElementById('bank_account_number').type === 'password')" aria-label="Show account number" aria-controls="bank_account_number" aria-pressed="false" title="Show account number" class="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-slate-500 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-400">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path id="bankAccountEyeSlash" d="m3 3 18 18" style="display:none"/>
+                                </svg>
+                            </button>
+                        @endif
+                    </div>
                 </div>
             @endforeach
             <div>
