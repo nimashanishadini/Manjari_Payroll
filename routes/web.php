@@ -10,14 +10,24 @@ use App\Http\Controllers\DashboardController;
 
 Route::redirect('/', '/dashboard');
 
+Route::get('/self-service', \App\Http\Controllers\SelfServiceController::class)
+    ->middleware('auth')
+    ->name('self-service.index');
+
 Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
 
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/profile', [ProfileController::class, 'edit'])
+        ->name('profile.edit');
+
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->name('profile.update');
+
+    Route::delete('/profile', [ProfileController::class, 'destroy'])
+        ->name('profile.destroy');
 });
+
 
 Route::prefix('hr')->name('hr.')->middleware('auth')->group(function () {
 Route::get('/organization-structure', function () {
@@ -48,12 +58,7 @@ Route::get('/leaves', function () {
             ]);
         })->name('leaves.index');
 
-Route::get('/device', function () {
-            return view('hr.shell-empty', [
-                'pageTitle' => 'Device',
-                'section' => 'device'
-            ]);
-        })->name('device.index');
+Route::get('/device', [\App\Http\Controllers\Hr\BiometricDeviceController::class, 'index'])->name('device.index');
 
 Route::get('/payroll', function () {
             return view('hr.shell-empty', [
@@ -77,7 +82,7 @@ Route::prefix('hr/person')
     ->name('hr.person.')
     ->group(function () {
 Route::get('/resigned', [\App\Http\Controllers\Hr\EmployeeResignationController::class, 'index'])->middleware('auth')->name('resigned');
-Route::view('/to-be-reviewed', 'hr.person.to-be-reviewed')->name('to-be-reviewed');
+Route::get('/to-be-reviewed', [\App\Http\Controllers\Hr\BiometricStagingController::class, 'index'])->middleware('auth')->name('to-be-reviewed');
 Route::get('/position-management', [\App\Http\Controllers\Hr\PositionManagementController::class, 'index'])->middleware('auth')->name('position-management');
 
     });
@@ -165,5 +170,18 @@ Route::middleware('auth')->prefix('hr/person/position-management')->name('hr.per
 
 Route::middleware('auth')->prefix('hr/person/notifications')->name('hr.person.notifications.')->group(function () {
     Route::get('/', [\App\Http\Controllers\Hr\AlarmNotificationController::class, 'index'])->name('index');
+    Route::post('/enrollments/{staging}/open', [\App\Http\Controllers\Hr\AlarmNotificationController::class, 'openEnrollment'])->name('enrollment.open');
     Route::post('/{alarm}/open', [\App\Http\Controllers\Hr\AlarmNotificationController::class, 'open'])->name('open');
+});
+
+Route::middleware('auth')->prefix('hr/device')->name('hr.device.')->group(function () {
+    Route::post('/', [\App\Http\Controllers\Hr\BiometricDeviceController::class, 'store'])->name('store');
+    Route::get('/{device}/edit', [\App\Http\Controllers\Hr\BiometricDeviceController::class, 'edit'])->name('edit');
+    Route::put('/{device}', [\App\Http\Controllers\Hr\BiometricDeviceController::class, 'update'])->name('update');
+});
+
+Route::middleware('auth')->prefix('hr/person/enrollments')->name('hr.person.enrollments.')->group(function () {
+    Route::post('/', [\App\Http\Controllers\Hr\BiometricStagingController::class, 'store'])->name('store');
+    Route::post('/{staging}/ignore', [\App\Http\Controllers\Hr\BiometricStagingController::class, 'ignore'])->name('ignore');
+    Route::post('/{staging}/promote', [\App\Http\Controllers\Hr\BiometricStagingController::class, 'promote'])->name('promote');
 });

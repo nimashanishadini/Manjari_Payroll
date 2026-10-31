@@ -10,6 +10,16 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
+    public function canReviewBiometricEnrollments(): bool
+    {
+        return in_array($this->role, ['hr', 'admin'], true);
+    }
+
+    public function canManageBiometricDevices(): bool
+    {
+        return in_array($this->role, ['hr', 'admin'], true);
+    }
+
     public function canManageEmploymentStructure(): bool
     {
         return in_array($this->role, ['hr', 'admin'], true);

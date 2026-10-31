@@ -12,6 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [\App\Http\Middleware\EmployeeSelfServiceAccess::class]);
         $middleware->trimStrings(except: ['bank_password']);
         $middleware->validateCsrfTokens(except: ['api/*']);
 
@@ -26,5 +27,5 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash(['bank_password', 'bank_name', 'bank_branch', 'bank_account_name', 'bank_account_number']);
+        $exceptions->dontFlash(['login_password', 'login_password_confirmation', 'bank_password', 'bank_name', 'bank_branch', 'bank_account_name', 'bank_account_number']);
     })->create();

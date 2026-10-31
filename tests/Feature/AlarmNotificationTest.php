@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\BiometricDevice;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\SystemAlarm;
 use App\Models\User;
+use App\Services\BiometricOnboardingService;
 use App\Services\EmployeeDocumentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -61,6 +63,45 @@ class AlarmNotificationTest extends TestCase
         $this->actingAs($second)->getJson($feed)->assertOk()->assertJsonPath('unread_count', 1)->assertJsonPath('notifications.0.is_read', false);
     }
 
+    public function test_pending_enrollments_share_the_bell_and_open_review_with_per_user_read_state(): void
+    {
+        $alarm = $this->alarm();
+        $employee = $alarm->document->employee;
+        $device = BiometricDevice::create(['name' => 'Entrance', 'brand' => 'Hikvision', 'serial_number' => 'DEVICE001',
+            'branch_id' => $employee->branch_id, 'ip_address' => '192.168.1.100', 'port' => 8000, 'timezone' => 'Asia/Colombo', 'is_active' => true]);
+        $staging = app(BiometricOnboardingService::class)->stage($device, '00025', 'Kamal');
+        $reviewer = $this->user();
+        $this->actingAs($reviewer);
+        $feed = route('hr.person.notifications.index');
+        $this->getJson($feed)->assertOk()->assertJsonPath('total', 2)->assertJsonPath('unread_count', 2)
+            ->assertJsonFragment(['type' => 'enrollment', 'enrollment_id' => '00025']);
+        $url = route('hr.person.notifications.enrollment.open', $staging);
+        $this->post($url)->assertRedirect(route('hr.person.create', ['staging' => $staging->id]));
+        $this->getJson($feed)->assertOk()->assertJsonPath('unread_count', 1)->assertJsonFragment(['type' => 'enrollment', 'is_read' => true]);
+        $this->post($url)->assertRedirect();
+        $this->assertDatabaseCount('biometric_staging_reads', 1);
+        $this->actingAs($this->user('admin'))->getJson($feed)->assertOk()->assertJsonPath('unread_count', 2);
+        $this->post(route('hr.person.enrollments.ignore', $staging), ['ignore_reason' => 'Test enrollment'])->assertRedirect();
+        $this->getJson($feed)->assertOk()->assertJsonPath('total', 1)->assertJsonMissing(['enrollment_id' => '00025']);
+        $this->post($url)->assertRedirect(route('hr.person.to-be-reviewed', ['status' => 'Ignored', 'search' => '00025']));
+        $this->actingAs($this->user('employee'))->postJson($url)->assertForbidden();
+    }
+
+    public function test_mixed_notifications_paginate_without_omitting_pending_enrollments(): void
+    {
+        $alarm = $this->alarm();
+        $device = BiometricDevice::create(['name' => 'Entrance', 'brand' => 'Hikvision', 'serial_number' => 'DEVICE001',
+            'branch_id' => $alarm->document->employee->branch_id, 'ip_address' => '192.168.1.100', 'port' => 8000, 'timezone' => 'Asia/Colombo', 'is_active' => true]);
+        for ($i = 1; $i <= 12; $i++) {
+            app(BiometricOnboardingService::class)->stage($device, 'NEW'.$i, null);
+        }
+        $this->actingAs($this->user());
+        $first = $this->getJson(route('hr.person.notifications.index'))->assertOk()->assertJsonPath('total', 13)->assertJsonPath('unread_count', 13)->assertJsonCount(10, 'notifications');
+        $second = $this->getJson($first->json('next_page_url'))->assertOk()->assertJsonCount(3, 'notifications')->assertJsonPath('next_page_url', null);
+        $keys = collect([...$first->json('notifications'), ...$second->json('notifications')])->map(fn ($item) => $item['type'].':'.$item['id']);
+        $this->assertCount(13, $keys->unique());
+    }
+
     public function test_expired_status_becomes_unread_again_and_renewal_removes_notification(): void
     {
         $alarm = $this->alarm();
@@ -86,7 +127,8 @@ class AlarmNotificationTest extends TestCase
         $this->actingAs($this->user('employee'));
         $this->getJson(route('hr.person.notifications.index'))->assertForbidden();
         $this->postJson(route('hr.person.notifications.open', $alarm))->assertForbidden();
-        $this->withoutVite()->get(route('dashboard'))->assertOk()->assertDontSee('id="alarmNotifications"', false);
+        $this->get(route('dashboard'))->assertRedirect(route('self-service.index'));
+        $this->withoutVite()->get(route('self-service.index'))->assertOk()->assertDontSee('id="alarmNotifications"', false);
         $alarm->document->employee->delete();
         $this->actingAs($this->user())->getJson(route('hr.person.notifications.index'))->assertOk()->assertJsonPath('total', 0);
         $this->postJson(route('hr.person.notifications.open', $alarm))->assertNotFound();
