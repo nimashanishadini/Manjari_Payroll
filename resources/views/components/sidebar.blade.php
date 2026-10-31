@@ -41,28 +41,28 @@
         'route' => 'hr.person.additional-information',
         'icon' => 'sliders',
     ],
-    [
-        'label' => 'Basic Configuration',
-        'type' => 'dropdown',
-        'icon' => 'settings',
-        'children' => [
-            [
-                'label' => 'Person Settings',
-                'route' => null,
-                'icon' => 'settings',
-            ],
-            [
-                'label' => 'Credential Settings',
-                'route' => null,
-                'icon' => 'key',
-            ],
-            [
-                'label' => 'Self-Registration Settings',
-                'route' => null,
-                'icon' => 'clipboard',
-            ],
-        ],
-    ],
+    // [
+    //     'label' => 'Basic Configuration',
+    //     'type' => 'dropdown',
+    //     'icon' => 'settings',
+    //     'children' => [
+    //         [
+    //             'label' => 'Person Settings',
+    //             'route' => null,
+    //             'icon' => 'settings',
+    //         ],
+    //         [
+    //             'label' => 'Credential Settings',
+    //             'route' => null,
+    //             'icon' => 'key',
+    //         ],
+    //         [
+    //             'label' => 'Self-Registration Settings',
+    //             'route' => null,
+    //             'icon' => 'clipboard',
+    //         ],
+    //     ],
+    // ],
 ],
 
 
@@ -72,7 +72,7 @@
                 'type' => 'heading',
             ],
             [
-                'label' => 'Access Control Device',
+                'label' => 'Biometric Devices',
                 'type' => 'page',
                 'route' => 'hr.device.index',
                 'icon' => 'device',
@@ -142,6 +142,13 @@
     $activeRoute = \Illuminate\Support\Facades\Route::currentRouteName();
 
     $menuItems = $menus[$section] ?? [];
+    if (auth()->user()?->role === 'employee') {
+        $heading = 'Self-Service';
+        $menuItems = [
+            ['label' => 'My Profile', 'type' => 'page', 'route' => 'self-service.index', 'icon' => 'users'],
+            ['label' => 'Account Settings', 'type' => 'page', 'route' => 'profile.edit', 'icon' => 'settings'],
+        ];
+    }
 
     $isRouteActive = function ($routeName) use ($activeRoute) {
         return $routeName !== null && $routeName === $activeRoute;

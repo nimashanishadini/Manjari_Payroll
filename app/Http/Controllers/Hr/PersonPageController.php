@@ -69,12 +69,20 @@ class PersonPageController extends Controller
     public function create(Request $request): \Illuminate\Http\Response
     {
         $employee = null;
+        $stagingEnrollment = null;
+        if ($request->filled('staging')) {
+            abort_unless($request->user()->canReviewBiometricEnrollments(), 403);
+            $request->validate(['staging' => ['required', 'integer'], 'employee' => ['prohibited']]);
+            $stagingEnrollment = \App\Models\BiometricStagingUser::with(['device', 'branch'])->findOrFail($request->input('staging'));
+            abort_unless($stagingEnrollment->status === \App\Models\BiometricStagingUser::PENDING, 409, 'This enrollment has already been reviewed.');
+        }
         if ($request->filled('employee')) {
             abort_unless(in_array((int) $request->input('employee'), $request->session()->get('person_registration_ids', []), true), 403);
             $employee = Employee::findOrFail($request->input('employee'));
         }
         return response()->view('hr.person.add-employee', [
             'employee' => $employee,
+            'stagingEnrollment' => $stagingEnrollment,
             'additionalFields' => EmployeeAdditionalField::orderBy('name')->get(),
             'additionalValues' => $employee ? DB::table('employee_additional_values')->where('employee_id', $employee->id)->pluck('value', 'employee_additional_field_id') : [],
             'employeeDocuments' => $employee ? $this->documentDetails($employee) : [],

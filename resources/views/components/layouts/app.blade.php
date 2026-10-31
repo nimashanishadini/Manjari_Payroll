@@ -633,6 +633,9 @@ body {
             aria-label="Main navigation"
         >
 
+            @if(auth()->user()->role === 'employee')
+                <a href="{{ route('self-service.index') }}" class="active">Self-Service</a>
+            @else
             <!-- DASHBOARD -->
 
             <a
@@ -811,6 +814,7 @@ body {
 
             </a>
 
+            @endif
         </nav>
 
         <!-- ======================================
@@ -856,7 +860,7 @@ body {
             = Show corresponding sidebar
         -->
 
-        @if($currentSection !== 'dashboard')
+        @if($currentSection !== 'dashboard' || auth()->user()->role === 'employee')
 
             <x-sidebar :section="$currentSection" />
 

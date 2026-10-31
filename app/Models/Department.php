@@ -18,6 +18,11 @@ class Department extends Model
         return $this->belongsTo(Branch::class);
     }
 
+    public function biometricDevices(): HasMany
+    {
+        return $this->hasMany(BiometricDevice::class);
+    }
+
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);

@@ -1,11 +1,11 @@
-@if(auth()->user()?->canManageEmployeeDocuments())
+@if(auth()->user()?->canManageEmployeeDocuments() || auth()->user()?->canReviewBiometricEnrollments())
     <details id="alarmNotifications" class="erp-notifications">
-        <summary id="alarmNotificationToggle" aria-label="Document notifications" aria-controls="alarmNotificationPanel" aria-expanded="false" title="Notifications">
+        <summary id="alarmNotificationToggle" aria-label="Notifications" aria-controls="alarmNotificationPanel" aria-expanded="false" title="Notifications">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
             <span id="alarmNotificationCount" hidden></span>
         </summary>
         <section id="alarmNotificationPanel" aria-labelledby="alarmNotificationTitle">
-            <header><div><h2 id="alarmNotificationTitle">Notifications</h2><p id="alarmNotificationSummary">Document expiry alerts</p></div><button type="button" id="closeAlarmNotifications" aria-label="Close notifications">×</button></header>
+            <header><div><h2 id="alarmNotificationTitle">Notifications</h2><p id="alarmNotificationSummary">Document alerts and enrollments awaiting review</p></div><button type="button" id="closeAlarmNotifications" aria-label="Close notifications">×</button></header>
             <p id="alarmNotificationStatus" role="status">Loading notifications…</p>
             <div id="alarmNotificationList"></div>
             <button type="button" id="moreAlarmNotifications" hidden>Load more</button>
@@ -53,7 +53,7 @@
                     count.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
                     count.hidden = !data.unread_count;
                     toggle.setAttribute('aria-label', `Notifications: ${data.unread_count} unread`);
-                    document.getElementById('alarmNotificationSummary').textContent = `${data.unread_count} unread · ${data.total} active document alerts`;
+                    document.getElementById('alarmNotificationSummary').textContent = `${data.unread_count} unread · ${data.total} active notifications`;
                     if (!append) list.replaceChildren();
                     for (const item of data.notifications) {
                         const form = document.createElement('form');
@@ -65,16 +65,22 @@
                         const button = document.createElement('button');
                         button.type = 'submit';
                         const title = document.createElement('strong');
-                        title.textContent = `${item.is_read ? '' : '● '}${item.document_type} · ${item.employee_name}`;
+                        title.textContent = item.type === 'enrollment'
+                            ? `${item.is_read ? '' : '● '}Pending enrollment · ${item.name}`
+                            : `${item.is_read ? '' : '● '}${item.document_type} · ${item.employee_name}`;
                         const details = document.createElement('p');
-                        details.textContent = `${item.employee_id} · ${item.file_name}`;
+                        details.textContent = item.type === 'enrollment'
+                            ? `${item.enrollment_id} · ${item.device} · ${item.branch}`
+                            : `${item.employee_id} · ${item.file_name}`;
                         const expiry = document.createElement('p');
-                        expiry.className = item.status === 'expired' ? 'alarm-expired' : 'alarm-expiring';
-                        expiry.textContent = `${item.status === 'expired' ? 'Expired' : 'Expiring soon'} · ${item.due_on} → Review document`;
+                        expiry.className = item.type === 'enrollment' ? 'alarm-expiring' : (item.status === 'expired' ? 'alarm-expired' : 'alarm-expiring');
+                        expiry.textContent = item.type === 'enrollment'
+                            ? 'Pending HR Review → Review enrollment'
+                            : `${item.status === 'expired' ? 'Expired' : 'Expiring soon'} · ${item.due_on} → Review document`;
                         button.append(title, details, expiry);
                         form.append(csrf, button); list.append(form);
                     }
-                    status.textContent = data.total ? '' : 'No document expiry notifications.';
+                    status.textContent = data.total ? '' : 'No active notifications.';
                     status.hidden = Boolean(data.total);
                     nextPage = data.next_page_url;
                     more.hidden = !nextPage;

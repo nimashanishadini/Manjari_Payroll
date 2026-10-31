@@ -18,6 +18,11 @@ class Branch extends Model
         return $this->hasMany(Department::class);
     }
 
+    public function biometricDevices(): HasMany
+    {
+        return $this->hasMany(BiometricDevice::class);
+    }
+
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);

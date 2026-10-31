@@ -25,10 +25,10 @@
 
             <div>
                 <h1 class="text-xl font-bold text-slate-900">
-                    Add Person
+                    {{ $stagingEnrollment ? 'Review Enrollment' : 'Add Person' }}
                 </h1>
                 <p class="mt-1 text-xs text-slate-500">
-                    Register a new employee
+                    {{ $stagingEnrollment ? 'Complete the profile and promote this device enrollment.' : 'Register a new employee' }}
                 </p>
             </div>
 
@@ -51,7 +51,7 @@
                     ['id' => 'basic', 'label' => 'Basic Information '],
                     ['id' => 'private', 'label' => 'Private Information'],
                     ['id' => 'access', 'label' => 'Access Level'],
-                    ['id' => 'schedule', 'label' => 'Schedule'],
+                    // ['id' => 'schedule', 'label' => 'Schedule'],
                     ['id' => 'documents', 'label' => 'Documents & Qualifications'],
                     ['id' => 'extra', 'label' => 'Additional Information'],
                     ['id' => 'employment', 'label' => 'Employment Details'],
@@ -238,8 +238,9 @@
                                 <p class="mt-1 text-xs text-slate-500">Required when confirming an employee from Probation to Permanent.</p>
                             </div>
                         </div>
+                        @include('hr.person.partials.biometric-promotion')
                         {{-- SELF SERVICE --}}
-                        <div class="grid gap-2 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center">
+                        <div @if($stagingEnrollment) hidden @endif class="grid gap-2 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center">
 
                             <label for="self_service"
                                    class="text-sm font-medium text-slate-700">
@@ -251,6 +252,7 @@
                                 <input
                                     type="checkbox"
                                     id="self_service"
+                                    @if($stagingEnrollment) disabled @endif
                                     name="allow_self_service"
                                     value="1"
                                     class="h-4 w-4 accent-rose-600"
@@ -417,6 +419,13 @@ const employeeTabIds = @json(array_column($tabs, 'id'));
 
 let currentEmployeeTab = 'basic';
 const savedEmployee = @json($employee);
+@php
+    $pendingEnrollmentData = $stagingEnrollment ? array_merge(
+        $stagingEnrollment->only(['id', 'raw_enrollment_id', 'raw_name', 'branch_id']),
+        ['department_id' => $stagingEnrollment->device->branch_id === $stagingEnrollment->branch_id ? $stagingEnrollment->device->department_id : null]
+    ) : null;
+@endphp
+const pendingEnrollment = @json($pendingEnrollmentData);
 let employeeRecordId = savedEmployee?.id ?? null;
 let photoRemoved = false;
 let employeeSaving = false;
@@ -776,6 +785,7 @@ async function saveEmploymentPeriod(event) {
             headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content},
         });
         const result = await response.json();
+        for (const id of ['promotionLoginPassword', 'promotionLoginConfirmation']) { const input = document.getElementById(id); if (input) input.value = ''; }
         if (!response.ok) {
             status.textContent = result.errors ? Object.values(result.errors).flat().join('\n') : (result.message || 'Unable to save employment period.');
             return;
@@ -935,6 +945,18 @@ function updateEmploymentDateFields() {
     document.getElementById('confirmed_date').required = type === 'Permanent' && loadedEmploymentType === 'Probation';
 }
 
+function togglePromotionLogin() {
+    const checkbox = document.getElementById('promotionCreateLogin');
+    if (!checkbox) return;
+    const fields = document.getElementById('promotionLoginFields');
+    fields.hidden = !checkbox.checked;
+    fields.querySelectorAll('input').forEach(input => {
+        input.disabled = !checkbox.checked;
+        input.required = checkbox.checked;
+        if (!checkbox.checked) input.value = '';
+    });
+}
+
 function populateEmployeeDetails(employee) {
     loadedEmploymentType = employee.employment_type ?? null;
     populateEmployeeResignation(employee);
@@ -964,6 +986,7 @@ function populateEmployeeDetails(employee) {
 }
 
 async function lookupEmployeeDetails() {
+    if (pendingEnrollment) return true;
     clearTimeout(employeeLookupTimer);
     const id = document.getElementById('employee_id').value.trim();
     if (!id || id === loadedEmployeeId) return true;
@@ -1149,7 +1172,7 @@ function updateEmployeeFooter() {
 
     const available = ['basic', 'private', 'documents', 'extra'].includes(currentEmployeeTab);
     saveButton.style.display = available ? 'inline-flex' : 'none';
-    saveButton.textContent = 'Save ' + document.getElementById('tab-' + currentEmployeeTab).textContent.trim();
+    saveButton.textContent = pendingEnrollment && !employeeRecordId && currentEmployeeTab === 'basic' ? 'Promote to Employee' : 'Save ' + document.getElementById('tab-' + currentEmployeeTab).textContent.trim();
 
     stepText.textContent = `Step ${index + 1} of ${total}`;
 
@@ -1169,6 +1192,11 @@ async function saveEmployee() {
     if (employeeSaving || !validateEmployeeIdentity()) return;
     if (!await lookupEmployeeDetails() || employeeSaving) return;
     const section = currentEmployeeTab;
+    if (pendingEnrollment && section === 'basic') {
+        for (const input of document.querySelectorAll('#panel-basic input[name], #panel-basic select[name]')) {
+            if (!input.disabled && !input.reportValidity()) return;
+        }
+    }
     if (section === 'basic') {
         for (const id of ['probation_end_date', 'confirmed_date']) {
             const input = document.getElementById(id);
@@ -1205,6 +1233,7 @@ async function saveEmployee() {
         }
     }
     if (section === 'basic') data.append('remove_photo', photoRemoved ? '1' : '0');
+    if (pendingEnrollment && section === 'basic') data.set('branch_id', pendingEnrollment.branch_id);
     const bankPassword = document.getElementById('bank_password');
     if (bankPassword) bankPassword.value = '';
     const button = document.getElementById('saveEmployeeButton');
@@ -1213,7 +1242,10 @@ async function saveEmployee() {
     button.disabled = true;
     status.textContent = 'Saving…';
     try {
-        const response = await fetch(@json(route('hr.person.sections.store')), {
+        const endpoint = pendingEnrollment && section === 'basic'
+            ? @json(route('hr.person.enrollments.promote', 0)).replace('/0/promote', '/' + pendingEnrollment.id + '/promote')
+            : @json(route('hr.person.sections.store'));
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content},
             body: data,
@@ -1229,7 +1261,7 @@ async function saveEmployee() {
         url.searchParams.set('employee', result.id);
         window.history.replaceState(null, '', url);
         if (section === 'basic') {
-            window.location.replace(@json(route('hr.person.create')));
+            window.location.replace(result.redirect_url ?? @json(route('hr.person.create')));
             return;
         }
         status.textContent = document.getElementById('tab-' + section).textContent.trim() + ' saved successfully.';
@@ -1308,6 +1340,14 @@ document.addEventListener('DOMContentLoaded', function () {
             if (input.type === 'checkbox') input.checked = Boolean(Number(savedEmployee[input.name]));
             else input.value = input.type === 'date' ? String(savedEmployee[input.name]).slice(0, 10) : savedEmployee[input.name];
         });
+    }
+    if (pendingEnrollment) {
+        populateEmployeeDetails({employee_id: pendingEnrollment.raw_enrollment_id, name: pendingEnrollment.raw_name ?? '', branch_id: pendingEnrollment.branch_id, department_id: pendingEnrollment.department_id});
+        employeeIdInput.readOnly = true;
+        document.getElementById('employee_branch').disabled = true;
+        document.getElementById('joined_date').value = @json(now('Asia/Colombo')->toDateString());
+        document.getElementById('employeeLookupStatus').textContent = 'Enrollment ID is retained from the device. Review the details before promoting.';
+        togglePromotionLogin();
     }
     updateEmploymentDateFields();
     document.getElementById('employment_type').addEventListener('change', updateEmploymentDateFields);

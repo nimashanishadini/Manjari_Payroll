@@ -29,6 +29,14 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        if ($request->user()->role === 'employee') {
+            $request->session()->forget('url.intended');
+
+            return $request->boolean('_redirect_after_login')
+                ? redirect()->route('self-service.index')
+                : response()->noContent();
+        }
+
         return $request->boolean('_redirect_after_login')
             ? redirect()->intended(route('dashboard'))
             : response()->noContent();
