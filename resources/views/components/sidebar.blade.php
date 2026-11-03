@@ -6,6 +6,12 @@
         
 'person' => [
     [
+        'label' => 'Branch Management',
+        'type' => 'page',
+        'route' => 'hr.organization-structure.index',
+        'icon' => 'briefcase',
+    ],
+    [
         'label' => 'Employee Management',
         'type' => 'dropdown',
         'icon' => 'users',
@@ -142,6 +148,9 @@
     $activeRoute = \Illuminate\Support\Facades\Route::currentRouteName();
 
     $menuItems = $menus[$section] ?? [];
+    if (!auth()->user()?->canManageEmploymentStructure()) {
+        $menuItems = array_values(array_filter($menuItems, fn ($item) => !in_array($item['route'] ?? null, ['hr.organization-structure.index', 'hr.departments.index'], true)));
+    }
     if (auth()->user()?->role === 'employee') {
         $heading = 'Self-Service';
         $menuItems = [

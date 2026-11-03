@@ -390,7 +390,7 @@ class PersonPageController extends Controller
         $branches = Branch::query()
             ->with([
                 'departments' => fn ($query) =>
-                    $query->withCount('employees')->orderBy('name'),
+                    $query->withCount(['employees', 'biometricDevices', 'employmentHistories'])->orderBy('name'),
             ])
             ->withCount('employees')
             ->orderBy('name')
@@ -444,6 +444,7 @@ class PersonPageController extends Controller
 
     public function storeDepartment(Request $request): RedirectResponse
     {
+        abort_unless($request->user()?->canManageEmploymentStructure(), 403);
         $validated = $request->validate([
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'name' => ['required', 'string', 'max:255'],

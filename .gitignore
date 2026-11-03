@@ -22,3 +22,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local biometric bridge build output, sample data and secrets
+/AttendanceBridge/bin/
+/AttendanceBridge/obj/
+/AttendanceBridge/**/*.local.json

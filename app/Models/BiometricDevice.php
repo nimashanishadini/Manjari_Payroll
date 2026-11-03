@@ -8,11 +8,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BiometricDevice extends Model
 {
+    protected $hidden = ['bridge_token_hash', 'bridge_token_expires_at'];
+
     protected $fillable = ['name', 'branch_id', 'department_id', 'brand', 'serial_number', 'ip_address', 'port', 'timezone', 'is_active'];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean', 'port' => 'integer', 'last_sync_at' => 'datetime'];
+        return ['is_active' => 'boolean', 'port' => 'integer', 'last_sync_at' => 'datetime', 'bridge_token_expires_at' => 'datetime'];
     }
 
     public function stagingUsers(): HasMany

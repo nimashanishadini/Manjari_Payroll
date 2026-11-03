@@ -30,12 +30,10 @@ Route::middleware('auth')->group(function (): void {
 
 
 Route::prefix('hr')->name('hr.')->middleware('auth')->group(function () {
-Route::get('/organization-structure', function () {
-            return view('hr.shell-empty', [
-                'pageTitle' => 'Person',
-                'section' => 'person'
-            ]);
-        })->name('organization-structure.index');
+Route::get('/organization-structure', [BranchController::class, 'index'])->name('organization-structure.index');
+Route::post('/branches', [BranchController::class, 'store'])->name('branches.store');
+Route::put('/branches/{branch}', [BranchController::class, 'update'])->name('branches.update');
+Route::delete('/branches/{branch}', [BranchController::class, 'destroy'])->name('branches.destroy');
 
  Route::get('/employee-management', function () {
             return view('hr.shell-empty', [
@@ -99,7 +97,7 @@ Route::get('/person', [
 Route::post('/person/departments', [
     \App\Http\Controllers\Hr\PersonPageController::class,
     'storeDepartment'
-])->name('hr.person.departments.store');
+])->middleware('auth')->name('hr.person.departments.store');
 
 Route::post('/person/employees', [
     \App\Http\Controllers\Hr\PersonPageController::class,
@@ -184,4 +182,11 @@ Route::middleware('auth')->prefix('hr/person/enrollments')->name('hr.person.enro
     Route::post('/', [\App\Http\Controllers\Hr\BiometricStagingController::class, 'store'])->name('store');
     Route::post('/{staging}/ignore', [\App\Http\Controllers\Hr\BiometricStagingController::class, 'ignore'])->name('ignore');
     Route::post('/{staging}/promote', [\App\Http\Controllers\Hr\BiometricStagingController::class, 'promote'])->name('promote');
+});
+
+Route::middleware('auth')->prefix('hr/departments')->name('hr.departments.')->group(function () {
+    Route::get('/', [DepartmentController::class, 'index'])->name('index');
+    Route::post('/', [DepartmentController::class, 'store'])->name('store');
+    Route::put('/{department}', [DepartmentController::class, 'update'])->name('update');
+    Route::delete('/{department}', [DepartmentController::class, 'destroy'])->name('destroy');
 });

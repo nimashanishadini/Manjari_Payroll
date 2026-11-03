@@ -10,6 +10,7 @@
         (
             request()->routeIs(
     'hr.organization-structure.*',
+    'hr.departments.*',
     'hr.employee-management.*',
     'hr.person.*'
 ) ? 'person' :

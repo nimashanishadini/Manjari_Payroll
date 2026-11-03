@@ -13,6 +13,11 @@ class Department extends Model
         'name',
     ];
 
+    public function employmentHistories(): HasMany
+    {
+        return $this->hasMany(EmploymentHistory::class);
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);

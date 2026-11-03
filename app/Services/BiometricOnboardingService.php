@@ -15,9 +15,9 @@ use Illuminate\Validation\ValidationException;
 
 class BiometricOnboardingService
 {
-    public function stage(BiometricDevice $device, string $enrollmentId, ?string $name = null, ?CarbonInterface $fetchedAt = null): BiometricStagingUser
+    public function stage(BiometricDevice $device, string $enrollmentId, ?string $name = null, ?CarbonInterface $fetchedAt = null, string $source = 'Manual'): BiometricStagingUser
     {
-        return DB::transaction(function () use ($device, $enrollmentId, $name, $fetchedAt) {
+        return DB::transaction(function () use ($device, $enrollmentId, $name, $fetchedAt, $source) {
             $locked = BiometricDevice::whereKey($device->id)->lockForUpdate()->firstOrFail();
             if (! $locked->is_active) {
                 throw ValidationException::withMessages(['device_id' => 'Choose an enabled device.']);
@@ -26,7 +26,7 @@ class BiometricOnboardingService
             // A repeated import never resets a reviewed row or creates another row.
             $row = BiometricStagingUser::firstOrCreate(
                 ['device_id' => $locked->id, 'raw_enrollment_id' => $enrollmentId],
-                ['raw_name' => trim($name ?? '') ?: null, 'branch_id' => $locked->branch_id, 'source' => 'Manual', 'fetched_at' => $fetchedAt ?? now()]
+                ['raw_name' => trim($name ?? '') ?: null, 'branch_id' => $locked->branch_id, 'source' => $source, 'fetched_at' => $fetchedAt ?? now()]
             );
             $fetchTime = $fetchedAt ?? now();
             if (! $row->wasRecentlyCreated && $fetchTime->gt($row->fetched_at)) {
