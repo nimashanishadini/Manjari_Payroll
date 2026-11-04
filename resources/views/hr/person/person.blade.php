@@ -243,12 +243,13 @@
                         class="ml-7 space-y-1 pb-2"
                     >
                         @forelse($branch->departments as $department)
+                            <div class="flex items-center gap-1">
                             <a
                                 href="{{ route('hr.person.index', [
                                     'branch_id' => $branch->id,
                                     'department_id' => $department->id
                                 ]) }}"
-                                class="flex items-center justify-between rounded-lg px-3 py-2 text-sm
+                                class="flex min-w-0 flex-1 items-center justify-between rounded-lg px-3 py-2 text-sm
                                 {{ $activeDepartment === $department->id
                                     ? 'bg-rose-100 font-semibold text-rose-700'
                                     : 'text-slate-600 hover:bg-slate-200' }}"
@@ -260,6 +261,14 @@
                                     {{ $department->employees_count }}
                                 </span>
                             </a>
+                            @if(auth()->user()?->canManageEmploymentStructure())
+                                <button type="button" data-edit-department="{{ $department->id }}" data-name="{{ $department->name }}" data-branch="{{ $branch->name }}" data-url="{{ route('hr.departments.update', $department) }}" class="rounded p-1 text-slate-500 hover:bg-slate-200" aria-label="Edit {{ $department->name }}" title="Edit department">✎</button>
+                                <form method="POST" action="{{ route('hr.departments.destroy', $department) }}" onsubmit="return confirm('Delete this unused department?');">
+                                    @csrf @method('DELETE')
+                                    <button class="rounded p-1 text-slate-500 hover:bg-slate-200 disabled:opacity-30" aria-label="Delete {{ $department->name }}" title="Only unused departments can be deleted" @disabled($department->employees_count || $department->biometric_devices_count || $department->employment_histories_count)>×</button>
+                                </form>
+                            @endif
+                            </div>
                         @empty
                             <p class="px-3 py-2 text-xs text-slate-400">
                                 No departments
@@ -287,8 +296,10 @@
                 </label>
                 <span class="person-toolbar-divider" aria-hidden="true"></span>
             <div class="person-hero-actions">
+                @if(auth()->user()?->canManageEmploymentStructure())
                 <button type="button" onclick="openPersonModal('departmentModal')"
                     class="person-action erp-primary-action">+ Add Department</button>
+                @endif
                 <a
     href="{{ route('hr.person.create') }}"
     class="person-action erp-primary-action"
@@ -475,6 +486,21 @@
 </div>
 
 {{-- ADD DEPARTMENT MODAL --}}
+@if(auth()->user()?->canManageEmploymentStructure())
+<div id="editDepartmentModal" class="person-modal hidden" role="dialog" aria-modal="true" aria-labelledby="editDepartmentTitle">
+    <div class="person-modal-panel w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+        <div class="flex items-center justify-between"><h2 id="editDepartmentTitle" class="text-xl font-bold text-slate-900">Edit Department</h2><button type="button" onclick="closePersonModal('editDepartmentModal')" aria-label="Close" class="text-2xl text-slate-500">&times;</button></div>
+        <form id="editDepartmentForm" method="POST" class="mt-6 space-y-5">
+            @csrf @method('PUT')
+            <input id="departmentEditorId" name="department_editor" type="hidden">
+            <p id="editDepartmentBranch" class="text-sm text-slate-500"></p>
+            <label class="block text-sm font-semibold text-slate-700">Department name<input id="editDepartmentName" name="name" required maxlength="255" class="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-sm"></label>
+            <p class="text-xs text-slate-500">The original branch is retained to protect employment history.</p>
+            <div class="flex justify-end gap-3"><button type="button" onclick="closePersonModal('editDepartmentModal')" class="rounded-lg border px-5 py-2.5 text-sm">Cancel</button><button class="erp-primary-action rounded-lg px-5 py-2.5 text-sm font-semibold">Save Department</button></div>
+        </form>
+    </div>
+</div>
+@endif
 <div
     id="departmentModal"
     class="person-modal hidden"
@@ -835,10 +861,22 @@
             department.value = department.dataset.oldValue;
         }
 
+        document.querySelectorAll('[data-edit-department]').forEach(button => {
+            button.addEventListener('click', () => {
+                document.getElementById('editDepartmentForm').action = button.dataset.url;
+                document.getElementById('departmentEditorId').value = button.dataset.editDepartment;
+                document.getElementById('editDepartmentName').value = button.dataset.name;
+                document.getElementById('editDepartmentBranch').textContent = 'Branch: ' + button.dataset.branch;
+                openPersonModal('editDepartmentModal');
+            });
+        });
         @if($errors->any())
             @if(session('open_modal') === 'department')
                 openPersonModal('departmentModal');
-            @else
+            @elseif(old('department_editor'))
+                const button = Array.from(document.querySelectorAll('[data-edit-department]')).find(el => el.dataset.editDepartment === @json((string) old('department_editor')));
+                if (button) { button.click(); document.getElementById('editDepartmentName').value = @json(old('name')); }
+            @elseif(session('open_modal') === 'employee')
                 openPersonModal('employeeModal');
             @endif
         @endif

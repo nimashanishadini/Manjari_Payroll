@@ -4,123 +4,64 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Models\Employee;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class DepartmentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(
-            Department::with('branch')
-                ->withCount('employees')
-                ->paginate(10)
-        );
+        $this->authorizeManagement($request);
+        return to_route('hr.person.index');
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'branch_id' => [
-                'required',
-                'integer',
-                'exists:branches,id',
-            ],
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-        ]);
-
-        $department = Department::create($validated);
-
-        return response()->json([
-            'message' => 'Department created successfully.',
-            'data' => $department->load('branch'),
-        ], 201);
+        $this->authorizeManagement($request);
+        Department::create($request->validate([
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'name' => ['required', 'string', 'max:255', Rule::unique('departments')->where('branch_id', $request->input('branch_id'))],
+        ]));
+        return to_route('hr.person.index')->with('status', 'Department created successfully.');
     }
 
-    public function show(string $id)
+    public function update(Request $request, Department $department)
     {
-        $department = Department::with([
-            'branch',
-            'employees',
-        ])->findOrFail($id);
-
-        return response()->json([
-            'data' => $department,
+        $this->authorizeManagement($request);
+        $data = $request->validate([
+            // Reparenting would rewrite historical branch reporting and device ownership.
+            'branch_id' => ['sometimes', 'required', Rule::in([$department->branch_id])],
+            'name' => ['required', 'string', 'max:255', Rule::unique('departments')->where('branch_id', $department->branch_id)->ignore($department->id)],
         ]);
+        $department->update(['name' => $data['name']]);
+        return to_route('hr.person.index')->with('status', 'Department updated successfully.');
     }
 
-    public function update(Request $request, string $id)
+    public function destroy(Request $request, Department $department)
     {
-        $department = Department::findOrFail($id);
-
-        $validated = $request->validate([
-            'branch_id' => [
-                'sometimes',
-                'required',
-                'integer',
-                'exists:branches,id',
-            ],
-            'name' => [
-                'sometimes',
-                'required',
-                'string',
-                'max:255',
-            ],
-        ]);
-
-        if (isset($validated['branch_id'])) {
-            $newBranchId = $validated['branch_id'];
-        } else {
-            $newBranchId = $department->branch_id;
+        $this->authorizeManagement($request);
+        try {
+            DB::transaction(function () use ($department) {
+                $locked = Department::whereKey($department->id)->lockForUpdate()->firstOrFail();
+                if (Employee::withTrashed()->where('department_id', $locked->id)->exists()
+                    || $locked->biometricDevices()->exists() || $locked->employmentHistories()->exists()) {
+                    throw ValidationException::withMessages(['department' => 'This department is in use by employees, devices or employment history and cannot be deleted.']);
+                }
+                $locked->delete();
+            });
+        } catch (QueryException $error) {
+            if (! in_array((string) $error->getCode(), ['23000', '23503'], true)) throw $error;
+            throw ValidationException::withMessages(['department' => 'This department is referenced by other records and cannot be deleted.']);
         }
-
-        if (isset($validated['name'])) {
-            $newName = $validated['name'];
-        } else {
-            $newName = $department->name;
-        }
-
-        $duplicateExists = Department::where(
-            'branch_id',
-            $newBranchId
-        )->where('name', $newName)
-         ->where('id', '!=', $department->id)
-         ->exists();
-
-        if ($duplicateExists) {
-            return response()->json([
-                'message' =>
-                    'This department name already exists in this branch.',
-            ], 422);
-        }
-
-        $department->update($validated);
-
-        return response()->json([
-            'message' => 'Department updated successfully.',
-            'data' => $department->fresh()->load('branch'),
-        ]);
+        return to_route('hr.person.index')->with('status', 'Unused department deleted.');
     }
 
-    public function destroy(string $id)
+    private function authorizeManagement(Request $request): void
     {
-        $department = Department::findOrFail($id);
-
-        if ($department->employees()->exists()) {
-            return response()->json([
-                'message' =>
-                    'Cannot delete a department that has employees.',
-            ], 409);
-        }
-
-        $department->delete();
-
-        return response()->json([
-            'message' => 'Department deleted successfully.',
-        ]);
+        abort_unless($request->user()?->canManageEmploymentStructure(), 403);
     }
 }
